@@ -12,12 +12,13 @@
             <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <!-- Date Range -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
-                    <input type="date" name="start_date" value="{{ request('start_date') }}" 
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <input type="date" name="start_date" value="{{ request('start_date', date('Y-m-d')) }}" 
                            class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
-                <div class="flex items-end">
-                    <input type="date" name="end_date" value="{{ request('end_date') }}" 
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <input type="date" name="end_date" value="{{ request('end_date', date('Y-m-d')) }}" 
                            class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
 
@@ -64,6 +65,101 @@
                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         Clear
                     </a>
+                    <button type="button" id="toggleAdvancedFilters"
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                        </svg>
+                        Advanced
+                    </button>
+                </div>
+            </div>
+
+            <!-- Advanced Filters Panel -->
+            <div id="advancedFiltersPanel" class="hidden border-t border-gray-200 pt-4 mt-4">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">Advanced Filters</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- IP Address Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">IP Address</label>
+                        <input type="text" name="ip_address" value="{{ request('ip_address') }}" placeholder="e.g., 192.168.1.1"
+                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- User ID Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">User ID</label>
+                        <input type="number" name="user_id" value="{{ request('user_id') }}" placeholder="User ID"
+                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- Route Name Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Route Name</label>
+                        <select name="route_name" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">All Routes</option>
+                            @foreach($filterOptions['routes'] as $route)
+                            <option value="{{ $route }}" {{ request('route_name') == $route ? 'selected' : '' }}>
+                                {{ $route }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Device Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Device</label>
+                        <select name="device" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">All Devices</option>
+                            @foreach($filterOptions['devices'] as $device)
+                            <option value="{{ $device }}" {{ request('device') == $device ? 'selected' : '' }}>
+                                {{ $device }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Country Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                        <select name="country" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">All Countries</option>
+                            @foreach($filterOptions['countries'] as $country)
+                            <option value="{{ $country }}" {{ request('country') == $country ? 'selected' : '' }}>
+                                {{ $country }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Browser Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Browser</label>
+                        <select name="browser" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">All Browsers</option>
+                            @foreach($filterOptions['browsers'] as $browser)
+                            <option value="{{ $browser }}" {{ request('browser') == $browser ? 'selected' : '' }}>
+                                {{ $browser }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Response Time Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Min Response Time (ms)</label>
+                        <input type="number" name="min_response_time" value="{{ request('min_response_time') }}" placeholder="e.g., 1000"
+                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- Error Only Filter -->
+                    <div class="flex items-end">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="errors_only" value="1" {{ request('errors_only') ? 'checked' : '' }}
+                                   class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <span class="ml-2 text-sm text-gray-700">Errors Only</span>
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -213,6 +309,41 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleButton = document.getElementById('toggleAdvancedFilters');
+    const advancedPanel = document.getElementById('advancedFiltersPanel');
+    
+    toggleButton.addEventListener('click', function() {
+        if (advancedPanel.classList.contains('hidden')) {
+            advancedPanel.classList.remove('hidden');
+            toggleButton.innerHTML = `
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                </svg>
+                Hide Advanced
+            `;
+        } else {
+            advancedPanel.classList.add('hidden');
+            toggleButton.innerHTML = `
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                </svg>
+                Advanced
+            `;
+        }
+    });
+    
+    // Show advanced panel if any advanced filters are set
+    const hasAdvancedFilters = {{ request()->hasAny(['ip_address', 'user_id', 'route_name', 'device', 'country', 'browser', 'min_response_time', 'errors_only']) ? 'true' : 'false' }};
+    if (hasAdvancedFilters) {
+        toggleButton.click();
+    }
+});
+</script>
+@endpush
 
 @push('scripts')
 <script>

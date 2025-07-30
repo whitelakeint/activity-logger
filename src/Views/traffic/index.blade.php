@@ -145,12 +145,12 @@
                                 <div class="flex items-center">
                                     <div class="w-full bg-gray-200 rounded-full h-2 mr-2">
                                         <div class="bg-blue-500 h-2 rounded-full" 
-                                             style="width: {{ min(($data['requests'] / max(array_column($trafficData['geographic_stats'], 'requests'))) * 100, 100) }}%"></div>
+                                             style="width: {{ !empty($trafficData['geographic_stats']) && is_array($trafficData['geographic_stats']) ? min(($data['requests'] / max(array_column($trafficData['geographic_stats'], 'requests'))) * 100, 100) : 0 }}%"></div>
                                     </div>
                                     <span class="text-xs text-gray-500 whitespace-nowrap">{{ number_format($data['requests']) }} requests</span>
                                 </div>
                             </div>
-                            @if(!empty($data['cities']))
+                            @if(!empty($data['cities']) && is_array($data['cities']))
                             <div class="mt-1 text-xs text-gray-400">
                                 Cities: {{ implode(', ', array_slice($data['cities'], 0, 3)) }}
                                 @if(count($data['cities']) > 3)
@@ -192,7 +192,7 @@
                             <div class="flex items-center space-x-2">
                                 <div class="w-20 bg-gray-200 rounded-full h-2">
                                     <div class="bg-blue-500 h-2 rounded-full" 
-                                         style="width: {{ min(($count / max($trafficData['browser_stats'])) * 100, 100) }}%"></div>
+                                         style="width: {{ !empty($trafficData['browser_stats']) && is_array($trafficData['browser_stats']) && max($trafficData['browser_stats']) > 0 ? min(($count / max($trafficData['browser_stats'])) * 100, 100) : 0 }}%"></div>
                                 </div>
                                 <span class="text-xs text-gray-500 w-12 text-right">{{ $count }}</span>
                             </div>
@@ -216,7 +216,7 @@
                             <div class="flex items-center space-x-2">
                                 <div class="w-20 bg-gray-200 rounded-full h-2">
                                     <div class="bg-green-500 h-2 rounded-full" 
-                                         style="width: {{ min(($count / max($trafficData['device_stats'])) * 100, 100) }}%"></div>
+                                         style="width: {{ !empty($trafficData['device_stats']) && is_array($trafficData['device_stats']) && max($trafficData['device_stats']) > 0 ? min(($count / max($trafficData['device_stats'])) * 100, 100) : 0 }}%"></div>
                                 </div>
                                 <span class="text-xs text-gray-500 w-12 text-right">{{ $count }}</span>
                             </div>
@@ -268,9 +268,9 @@
                             <div class="flex items-center">
                                 <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
                                     <div class="bg-blue-500 h-2 rounded-full" 
-                                         style="width: {{ min(($views / max($trafficData['top_pages'])) * 100, 100) }}%"></div>
+                                         style="width: {{ !empty($trafficData['top_pages']) && is_array($trafficData['top_pages']) && max($trafficData['top_pages']) > 0 ? min(($views / max($trafficData['top_pages'])) * 100, 100) : 0 }}%"></div>
                                 </div>
-                                <span class="text-sm text-gray-500">{{ number_format(($views / array_sum($trafficData['top_pages'])) * 100, 1) }}%</span>
+                                <span class="text-sm text-gray-500">{{ !empty($trafficData['top_pages']) && is_array($trafficData['top_pages']) && array_sum($trafficData['top_pages']) > 0 ? number_format(($views / array_sum($trafficData['top_pages'])) * 100, 1) : 0 }}%</span>
                             </div>
                         </td>
                     </tr>

@@ -27,15 +27,17 @@ class ActivityLoggerWebController extends Controller
         $filters = $this->buildFilters($request);
         $dateRange = !empty($filters) ? $filters : $this->getDefaultDateRange();
         
-        // Get dashboard data
+        // Get dashboard data with filters applied
         $overview = $this->getOverviewStats($dateRange);
-        $recentActivity = $this->searchService->getRecentActivity(10);
-        $recentErrors = ActivityLogger::getRecentErrors(60, 5);
+        $recentActivity = ActivityLogger::search(array_merge($filters, ['limit' => 10]));
+        $recentErrors = $this->searchService->searchErrors($filters)->take(5);
+        $filterOptions = $this->getFilterOptions();
         
         return view('activity-logger::dashboard.index', compact(
             'overview', 
             'recentActivity', 
-            'recentErrors'
+            'recentErrors',
+            'filterOptions'
         ));
     }
 
@@ -334,13 +336,23 @@ class ActivityLoggerWebController extends Controller
         $filterFields = [
             'user_id', 'ip_address', 'method', 'url', 'route_name', 
             'controller_action', 'response_code', 'country', 'city',
-            'browser', 'platform', 'device', 'start_date', 'end_date'
+            'browser', 'platform', 'device', 'start_date', 'end_date',
+            'min_response_time', 'errors_only'
         ];
         
         foreach ($filterFields as $field) {
             if ($request->filled($field)) {
                 $filters[$field] = $request->get($field);
             }
+        }
+        
+        // Handle special filters
+        if ($request->filled('min_response_time')) {
+            $filters['min_response_time'] = (int) $request->get('min_response_time');
+        }
+        
+        if ($request->filled('errors_only') && $request->get('errors_only') == '1') {
+            $filters['response_code_min'] = 400;
         }
         
         return $filters;
@@ -362,14 +374,32 @@ class ActivityLoggerWebController extends Controller
 
     protected function getFilterOptions(): array
     {
-        // Get filter options from database
-        return [
-            'methods' => ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-            'response_codes' => [200, 201, 302, 400, 401, 403, 404, 422, 500, 503],
-            'browsers' => ['Chrome', 'Firefox', 'Safari', 'Edge'],
-            'platforms' => ['Windows', 'Mac', 'Linux', 'Android', 'iOS'],
-            'devices' => ['Desktop', 'Mobile', 'Tablet'],
-        ];
+        try {
+            // Get dynamic filter options from database
+            $logs = ActivityLogger::search([
+                'start_date' => Carbon::now()->subDays(30)->toDateString(),
+                'end_date' => Carbon::now()->toDateString(),
+            ]);
+
+            return [
+                'methods' => $logs->pluck('method')->unique()->filter()->sort()->values()->toArray(),
+                'response_codes' => $logs->pluck('response_code')->unique()->filter()->sort()->values()->toArray(),
+                'routes' => $logs->pluck('route_name')->unique()->filter()->sort()->values()->toArray(),
+                'devices' => $logs->pluck('device')->unique()->filter()->sort()->values()->toArray(),
+                'countries' => $logs->pluck('country')->unique()->filter()->sort()->values()->toArray(),
+                'browsers' => $logs->pluck('browser')->unique()->filter()->sort()->values()->toArray(),
+            ];
+        } catch (\Exception $e) {
+            // Fallback to static values if database query fails
+            return [
+                'methods' => ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+                'response_codes' => [200, 201, 302, 400, 401, 403, 404, 422, 500, 503],
+                'routes' => [],
+                'devices' => ['Desktop', 'Mobile', 'Tablet'],
+                'countries' => [],
+                'browsers' => ['Chrome', 'Firefox', 'Safari', 'Edge'],
+            ];
+        }
     }
 
     protected function getPerformanceOverview(array $dateRange): array
@@ -479,7 +509,14 @@ class ActivityLoggerWebController extends Controller
     protected function getTopPages(array $dateRange): array
     {
         $stats = ActivityLogger::getStatistics($dateRange);
-        return array_slice($stats['top_urls'], 0, 20, true);
+        $topUrls = $stats['top_urls'] ?? [];
+        
+        // Convert Collection to array if needed
+        if ($topUrls instanceof \Illuminate\Support\Collection) {
+            $topUrls = $topUrls->toArray();
+        }
+        
+        return is_array($topUrls) ? array_slice($topUrls, 0, 20, true) : [];
     }
 
     protected function getGeographicStats(array $dateRange): array
@@ -489,7 +526,7 @@ class ActivityLoggerWebController extends Controller
             ->map(function ($group) {
                 return [
                     'requests' => $group->count(),
-                    'cities' => $group->pluck('city')->unique()->values(),
+                    'cities' => $group->pluck('city')->unique()->values()->toArray(),
                 ];
             })
             ->toArray();
@@ -498,13 +535,27 @@ class ActivityLoggerWebController extends Controller
     protected function getDeviceStats(array $dateRange): array
     {
         $stats = ActivityLogger::getStatistics($dateRange);
-        return $stats['devices'];
+        $devices = $stats['devices'] ?? [];
+        
+        // Convert Collection to array if needed
+        if ($devices instanceof \Illuminate\Support\Collection) {
+            $devices = $devices->toArray();
+        }
+        
+        return is_array($devices) ? $devices : [];
     }
 
     protected function getBrowserStats(array $dateRange): array
     {
         $stats = ActivityLogger::getStatistics($dateRange);
-        return $stats['browsers'];
+        $browsers = $stats['browsers'] ?? [];
+        
+        // Convert Collection to array if needed
+        if ($browsers instanceof \Illuminate\Support\Collection) {
+            $browsers = $browsers->toArray();
+        }
+        
+        return is_array($browsers) ? $browsers : [];
     }
 
     protected function getActiveUsers(array $dateRange): array

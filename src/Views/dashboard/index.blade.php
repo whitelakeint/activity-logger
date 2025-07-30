@@ -5,8 +5,71 @@
 
 @section('content')
 <div x-data="dashboard()" x-init="init()" @filters-applied.window="handleFiltersApplied($event)">
-    <!-- Advanced Filters -->
-    @include('activity-logger::components.advanced-filters')
+    <!-- Filters Panel -->
+    <div class="bg-white shadow rounded-lg mb-6">
+        <form method="GET" action="{{ route('activity-logger.dashboard') }}">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- Date Range -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <input type="date" name="start_date" value="{{ request('start_date', date('Y-m-d', strtotime('-7 days'))) }}" 
+                           class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <input type="date" name="end_date" value="{{ request('end_date', date('Y-m-d')) }}" 
+                           class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                <!-- Method Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Method</label>
+                    <select name="method" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">All Methods</option>
+                        @foreach($filterOptions['methods'] as $method)
+                        <option value="{{ $method }}" {{ request('method') == $method ? 'selected' : '' }}>
+                            {{ $method }}
+                        </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Response Code Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Response Code</label>
+                    <select name="response_code" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">All Codes</option>
+                        @foreach($filterOptions['response_codes'] as $code)
+                        <option value="{{ $code }}" {{ request('response_code') == $code ? 'selected' : '' }}>
+                            {{ $code }}
+                        </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- URL Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                    <input type="text" name="url" value="{{ request('url') }}" placeholder="Filter by URL"
+                           class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                <!-- Filter Actions -->
+                <div class="flex items-end space-x-2">
+                    <button type="submit" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        Filter
+                    </button>
+                    <a href="{{ route('activity-logger.dashboard') }}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        Clear
+                    </a>
+                </div>
+            </div>
+        </div>
+        </form>
+    </div>
     
     <!-- Overview Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
