@@ -49,8 +49,18 @@ class ActivityLoggerServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
         
+        // Load views
+        $this->loadViewsFrom(__DIR__ . '/../Views', 'activity-logger');
+        
+        // Publish views for customization
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__ . '/../Views' => resource_path('views/vendor/activity-logger'),
+            ], 'activity-logger-views');
+        }
+        
         // Load routes if enabled
-        if (config('activity-logger.enable_routes', true)) {
+        if (config('activity-logger.routes.enable_routes', true)) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
         }
 
