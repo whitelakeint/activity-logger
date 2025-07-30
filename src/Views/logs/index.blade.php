@@ -7,6 +7,7 @@
 <div x-data="logsTable()" x-init="init()">
     <!-- Filters Panel -->
     <div class="bg-white shadow rounded-lg mb-6">
+        <form method="GET" action="{{ route('activity-logger.logs') }}">
         <div class="px-4 py-5 sm:p-6">
             <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <!-- Date Range -->
@@ -66,6 +67,7 @@
                 </div>
             </div>
         </div>
+        </form>
     </div>
 
     <!-- Results Summary -->

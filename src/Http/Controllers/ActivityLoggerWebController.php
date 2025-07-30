@@ -22,9 +22,10 @@ class ActivityLoggerWebController extends Controller
     /**
      * Main dashboard view
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $dateRange = $this->getDefaultDateRange();
+        $filters = $this->buildFilters($request);
+        $dateRange = !empty($filters) ? $filters : $this->getDefaultDateRange();
         
         // Get dashboard data
         $overview = $this->getOverviewStats($dateRange);
@@ -132,7 +133,7 @@ class ActivityLoggerWebController extends Controller
         $userData = [
             'overview' => $this->getUserOverview($dateRange),
             'active_users' => $this->getActiveUsers($dateRange),
-            'user_patterns' => $this->getUserPatterns($dateRange),
+            'user_patterns' => $this->getAllUserPatterns($dateRange),
         ];
         
         return view('activity-logger::users.index', compact('userData'));
@@ -183,6 +184,35 @@ class ActivityLoggerWebController extends Controller
 
         return response()->json($stats);
     }
+    
+    /**
+     * Server-Sent Events endpoint for real-time notifications
+     */
+    public function realtimeNotifications()
+    {
+        return response()->stream(function () {
+            while (true) {
+                $notifications = $this->getRealtimeNotifications();
+                
+                if (!empty($notifications)) {
+                    echo "data: " . json_encode($notifications) . "\n\n";
+                    ob_flush();
+                    flush();
+                }
+                
+                sleep(5); // Check every 5 seconds
+                
+                // Check if connection is still alive
+                if (connection_aborted()) {
+                    break;
+                }
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
 
     /**
      * AJAX: Chart data for various visualizations
@@ -217,6 +247,9 @@ class ActivityLoggerWebController extends Controller
         try {
             $data = ActivityLogger::export($filters, $format);
             
+            // Store the exported data in session for download
+            session(['export_data' => $data, 'export_format' => $format]);
+            
             return response()->json([
                 'success' => true,
                 'download_url' => route('activity-logger.download', [
@@ -229,6 +262,67 @@ class ActivityLoggerWebController extends Controller
                 'error' => 'Export failed: ' . $e->getMessage()
             ], 500);
         }
+    }
+    
+    /**
+     * Download exported file
+     */
+    public function download($filename)
+    {
+        $data = session('export_data');
+        $format = session('export_format', 'json');
+        
+        if (!$data) {
+            abort(404, 'Export data not found');
+        }
+        
+        // Clear the session data
+        session()->forget(['export_data', 'export_format']);
+        
+        $headers = [
+            'Content-Type' => $format === 'json' ? 'application/json' : 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+        
+        if ($format === 'json') {
+            $content = json_encode($data, JSON_PRETTY_PRINT);
+        } else {
+            // CSV format
+            $content = $this->convertToCSV($data);
+        }
+        
+        return response($content, 200, $headers);
+    }
+    
+    /**
+     * Convert data to CSV format
+     */
+    protected function convertToCSV($data): string
+    {
+        if (empty($data)) {
+            return '';
+        }
+        
+        $output = fopen('php://temp', 'r+');
+        
+        // Write headers
+        if (is_array($data) && !empty($data)) {
+            $firstRow = reset($data);
+            if (is_array($firstRow) || is_object($firstRow)) {
+                fputcsv($output, array_keys((array)$firstRow));
+            }
+        }
+        
+        // Write data
+        foreach ($data as $row) {
+            fputcsv($output, (array)$row);
+        }
+        
+        rewind($output);
+        $csv = stream_get_contents($output);
+        fclose($output);
+        
+        return $csv;
     }
 
     // Protected helper methods
@@ -440,6 +534,12 @@ class ActivityLoggerWebController extends Controller
         // Implementation for user patterns
         return [];
     }
+    
+    protected function getAllUserPatterns(array $dateRange): array
+    {
+        // Implementation for all user patterns
+        return [];
+    }
 
     protected function getUserStats($userId, array $dateRange): array
     {
@@ -485,5 +585,47 @@ class ActivityLoggerWebController extends Controller
     {
         // Implementation for error trends chart
         return [];
+    }
+    
+    /**
+     * Get real-time notifications data
+     */
+    protected function getRealtimeNotifications(): array
+    {
+        $notifications = [];
+        
+        // Check for recent errors
+        $recentErrors = $this->searchService->searchErrors([
+            'start_date' => now()->subMinutes(5)->toDateString(),
+            'end_date' => now()->toDateString(),
+        ])->take(5);
+        
+        foreach ($recentErrors as $error) {
+            $notifications[] = [
+                'type' => 'error',
+                'title' => 'Error Detected',
+                'message' => "Error {$error->response_code} on {$error->url}",
+                'timestamp' => $error->created_at->toIso8601String(),
+                'severity' => 'high',
+            ];
+        }
+        
+        // Check for performance issues
+        $slowRequests = ActivityLogger::search([
+            'start_date' => now()->subMinutes(5)->toDateString(),
+            'end_date' => now()->toDateString(),
+        ])->where('response_time', '>', 3000)->take(3);
+        
+        foreach ($slowRequests as $request) {
+            $notifications[] = [
+                'type' => 'performance',
+                'title' => 'Slow Request Detected',
+                'message' => "Response time: {$request->response_time}ms for {$request->url}",
+                'timestamp' => $request->created_at->toIso8601String(),
+                'severity' => 'medium',
+            ];
+        }
+        
+        return $notifications;
     }
 }

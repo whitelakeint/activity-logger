@@ -138,7 +138,7 @@
                     <div class="flex items-center justify-between">
                         <div class="flex-1">
                             <div class="flex items-center space-x-2">
-                                <span class="text-lg">{{ $this->getCountryFlag($country) }}</span>
+                                <span class="text-lg">{{ getCountryFlag($country) }}</span>
                                 <span class="text-sm font-medium text-gray-900">{{ $country }}</span>
                             </div>
                             <div class="mt-1">

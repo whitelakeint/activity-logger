@@ -4,7 +4,10 @@
 @section('page-title', 'Dashboard')
 
 @section('content')
-<div x-data="dashboard()" x-init="init()">
+<div x-data="dashboard()" x-init="init()" @filters-applied.window="handleFiltersApplied($event)">
+    <!-- Advanced Filters -->
+    @include('activity-logger::components.advanced-filters')
+    
     <!-- Overview Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <!-- Total Requests -->
@@ -346,6 +349,14 @@ function dashboard() {
                 console.error('Failed to update real-time stats:', error);
                 ActivityLogger.showToast('Failed to update dashboard', 'error');
             }
+        },
+        
+        handleFiltersApplied(event) {
+            const filters = event.detail.filters;
+            
+            // Reload the page with filter parameters
+            const params = new URLSearchParams(filters);
+            window.location.href = window.location.pathname + '?' + params.toString();
         }
     }
 }

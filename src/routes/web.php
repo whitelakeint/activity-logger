@@ -22,8 +22,10 @@ Route::prefix('activity-logger')->name('activity-logger.')->group(function () {
     // AJAX API Routes for Dashboard
     Route::prefix('api')->group(function () {
         Route::get('realtime-stats', [ActivityLoggerWebController::class, 'realtimeStats'])->name('api.realtime');
+        Route::get('realtime-stats/notifications', [ActivityLoggerWebController::class, 'realtimeNotifications'])->name('api.realtime.notifications');
         Route::get('chart-data', [ActivityLoggerWebController::class, 'chartData'])->name('api.charts');
         Route::post('export', [ActivityLoggerWebController::class, 'export'])->name('api.export');
+        Route::get('download/{filename}', [ActivityLoggerWebController::class, 'download'])->name('download');
         
         // Legacy API Routes for Activity Logs
         Route::get('logs', [ActivityLogController::class, 'index'])->name('api.logs.index');
