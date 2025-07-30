@@ -69,7 +69,7 @@ class ActivityLoggerMiddleware
         }
         
         $data = [
-            'user_id' => $user ? $user->id : null;,
+            'user_id' => $user ? $user->id : null,
             'user_name' => $user ? ($user->name ?? null) : null,
             'user_email' => $user ? ($user->email ?? null) : null,
             'session_id' => session()->getId(),
