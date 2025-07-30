@@ -15,11 +15,6 @@ class ActivityLoggerMiddleware
     protected $startTime;
     protected $startMemory;
 
-    public function __construct()
-    {
-        $this->middleware('auth');
-    }
-
     public function handle(Request $request, Closure $next)
     {
         if ($this->shouldSkipLogging($request)) {
