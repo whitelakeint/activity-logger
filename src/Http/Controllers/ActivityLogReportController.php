@@ -87,13 +87,23 @@ class ActivityLogReportController extends Controller
         $type = $request->get('type', 'daily');
         $format = $request->get('format', 'json');
         
-        $reportData = match ($type) {
-            'daily' => $this->dailyReport($request)->getData(),
-            'weekly' => $this->weeklyReport($request)->getData(),
-            'monthly' => $this->monthlyReport($request)->getData(),
-            'custom' => $this->customReport($request)->getData(),
-            default => ['error' => 'Invalid report type'],
-        };
+        switch ($type) {
+            case 'daily':
+                $reportData = $this->dailyReport($request)->getData();
+                break;
+            case 'weekly':
+                $reportData = $this->weeklyReport($request)->getData();
+                break;
+            case 'monthly':
+                $reportData = $this->monthlyReport($request)->getData();
+                break;
+            case 'custom':
+                $reportData = $this->customReport($request)->getData();
+                break;
+            default:
+                $reportData = ['error' => 'Invalid report type'];
+                break;
+        }
 
         if ($format === 'csv') {
             return $this->exportToCsv($reportData);

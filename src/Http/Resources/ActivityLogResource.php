@@ -13,7 +13,7 @@ class ActivityLogResource extends JsonResource
             'user_id' => $this->user_id,
             'session_id' => $this->session_id,
             'ip_address' => $this->ip_address,
-            'requested_at' => $this->requested_at?->toISOString(),
+            'requested_at' => $this->requested_at ? $this->requested_at->toISOString() : null,
             'user_agent' => $this->user_agent,
             'method' => $this->method,
             'url' => $this->url,
@@ -45,8 +45,8 @@ class ActivityLogResource extends JsonResource
             'is_ajax' => $this->is_ajax,
             'is_mobile' => $this->is_mobile,
             'custom_data' => $this->custom_data,
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toISOString() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toISOString() : null,
             
             // Computed fields
             'formatted_duration' => $this->formatted_duration,

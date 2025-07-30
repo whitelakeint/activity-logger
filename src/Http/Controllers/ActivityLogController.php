@@ -221,10 +221,13 @@ class ActivityLogController extends Controller
 
     protected function getContentType(string $format): string
     {
-        return match ($format) {
-            'csv' => 'text/csv',
-            'xml' => 'application/xml',
-            default => 'application/json',
-        };
+        switch ($format) {
+            case 'csv':
+                return 'text/csv';
+            case 'xml':
+                return 'application/xml';
+            default:
+                return 'application/json';
+        }
     }
 }

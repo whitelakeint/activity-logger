@@ -114,7 +114,7 @@ git checkout main
 
 2. Create and push first tag:
 ```bash
-git tag -a v1.0.0 -m "Release version 1.0.0
+git tag -a v1.0.1 -m "Release version 1.0.0
 
 Initial stable release with:
 - Complete activity logging system
@@ -126,7 +126,7 @@ Initial stable release with:
 - Export functionality
 - Laravel 9.x, 10.x, 11.x support"
 
-git push origin v1.0.0
+git push origin v1.0.1
 ```
 
 ## Step 6: Testing the Installation

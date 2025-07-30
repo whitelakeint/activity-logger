@@ -4,12 +4,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
+class CreateActivityLogsTable extends Migration
 {
     public function up()
     {
         Schema::create('activity_logs', function (Blueprint $table) {
-            $table->id();
+            $table->bigIncrements('id');
             $table->unsignedBigInteger('user_id')->nullable()->index();
             $table->string('session_id')->nullable()->index();
             $table->string('ip_address', 45)->index();
@@ -33,7 +33,6 @@ return new class extends Migration
             $table->string('error_type')->nullable()->index();
 
             // Additional Context
-            $table->string('route_name')->nullable();
             $table->string('controller_action')->nullable();
             $table->json('middleware')->nullable();
             $table->string('request_id', 100)->nullable(); // For tracking related requests
@@ -53,7 +52,6 @@ return new class extends Migration
             $table->string('browser')->nullable();
             $table->string('platform')->nullable();
             $table->string('device')->nullable();
-            $table->string('referer')->nullable();
             $table->boolean('is_ajax')->default(false);
             $table->boolean('is_mobile')->default(false);
             $table->json('custom_data')->nullable();
@@ -78,4 +76,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('activity_logs');
     }
-};
+}

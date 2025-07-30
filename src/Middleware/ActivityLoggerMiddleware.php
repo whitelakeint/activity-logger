@@ -191,7 +191,7 @@ class ActivityLoggerMiddleware
     {
         $contentType = $response->headers->get('Content-Type', '');
         
-        if (str_contains($contentType, 'application/json') || str_contains($contentType, 'text/')) {
+        if (strpos($contentType, 'application/json') !== false || strpos($contentType, 'text/') !== false) {
             return true;
         }
 
