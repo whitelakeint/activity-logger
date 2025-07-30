@@ -186,31 +186,15 @@ class ActivityLoggerWebController extends Controller
     }
     
     /**
-     * Server-Sent Events endpoint for real-time notifications
+     * AJAX endpoint for real-time notifications
      */
-    public function realtimeNotifications()
+    public function realtimeNotifications(): JsonResponse
     {
-        return response()->stream(function () {
-            while (true) {
-                $notifications = $this->getRealtimeNotifications();
-                
-                if (!empty($notifications)) {
-                    echo "data: " . json_encode($notifications) . "\n\n";
-                    ob_flush();
-                    flush();
-                }
-                
-                sleep(5); // Check every 5 seconds
-                
-                // Check if connection is still alive
-                if (connection_aborted()) {
-                    break;
-                }
-            }
-        }, 200, [
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
-            'X-Accel-Buffering' => 'no',
+        $notifications = $this->getRealtimeNotifications();
+        
+        return response()->json([
+            'notifications' => $notifications,
+            'timestamp' => now()->toIso8601String()
         ]);
     }
 
@@ -594,36 +578,42 @@ class ActivityLoggerWebController extends Controller
     {
         $notifications = [];
         
-        // Check for recent errors
-        $recentErrors = $this->searchService->searchErrors([
-            'start_date' => now()->subMinutes(5)->toDateString(),
-            'end_date' => now()->toDateString(),
-        ])->take(5);
-        
-        foreach ($recentErrors as $error) {
-            $notifications[] = [
-                'type' => 'error',
-                'title' => 'Error Detected',
-                'message' => "Error {$error->response_code} on {$error->url}",
-                'timestamp' => $error->created_at->toIso8601String(),
-                'severity' => 'high',
-            ];
-        }
-        
-        // Check for performance issues
-        $slowRequests = ActivityLogger::search([
-            'start_date' => now()->subMinutes(5)->toDateString(),
-            'end_date' => now()->toDateString(),
-        ])->where('response_time', '>', 3000)->take(3);
-        
-        foreach ($slowRequests as $request) {
-            $notifications[] = [
-                'type' => 'performance',
-                'title' => 'Slow Request Detected',
-                'message' => "Response time: {$request->response_time}ms for {$request->url}",
-                'timestamp' => $request->created_at->toIso8601String(),
-                'severity' => 'medium',
-            ];
+        try {
+            // Check for recent errors (last 5 minutes only)
+            $recentErrors = $this->searchService->searchErrors([
+                'start_date' => now()->subMinutes(5)->toDateString(),
+                'end_date' => now()->toDateString(),
+            ])->take(3); // Limit to 3 to avoid overwhelming
+            
+            foreach ($recentErrors as $error) {
+                $notifications[] = [
+                    'type' => 'error',
+                    'title' => 'Error Detected',
+                    'message' => "Error {$error->response_code} on {$error->url}",
+                    'timestamp' => $error->created_at->toIso8601String(),
+                    'severity' => 'high',
+                ];
+            }
+            
+            // Check for performance issues (last 5 minutes only)
+            $slowRequests = ActivityLogger::search([
+                'start_date' => now()->subMinutes(5)->toDateString(),
+                'end_date' => now()->toDateString(),
+            ])->where('response_time', '>', 3000)->take(2); // Limit to 2
+            
+            foreach ($slowRequests as $request) {
+                $notifications[] = [
+                    'type' => 'performance',
+                    'title' => 'Slow Request Detected',
+                    'message' => "Response time: {$request->response_time}ms for {$request->url}",
+                    'timestamp' => $request->created_at->toIso8601String(),
+                    'severity' => 'medium',
+                ];
+            }
+            
+        } catch (\Exception $e) {
+            // Log error but don't break the response
+            \Log::error('Error fetching notifications: ' . $e->getMessage());
         }
         
         return $notifications;

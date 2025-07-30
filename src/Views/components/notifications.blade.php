@@ -228,7 +228,6 @@ function notificationSystem() {
         init() {
             this.initializeEventSource();
             this.loadStoredNotifications();
-            this.startPeriodicCheck();
             
             // Global notification methods
             window.showNotification = this.addNotification.bind(this);
@@ -236,24 +235,31 @@ function notificationSystem() {
         },
         
         initializeEventSource() {
-            // Initialize Server-Sent Events for real-time notifications
-            if (typeof EventSource !== 'undefined') {
-                this.eventSource = new EventSource('{{ route("activity-logger.api.realtime") }}/notifications');
-                
-                this.eventSource.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    this.handleRealtimeNotification(data);
-                };
-                
-                this.eventSource.onerror = () => {
-                    console.log('EventSource connection error, retrying...');
-                    setTimeout(() => {
-                        if (this.eventSource.readyState === EventSource.CLOSED) {
-                            this.initializeEventSource();
+            // Use AJAX polling instead of Server-Sent Events for better compatibility
+            this.startNotificationPolling();
+        },
+        
+        startNotificationPolling() {
+            setInterval(async () => {
+                try {
+                    const response = await fetch('{{ route("activity-logger.api.realtime.notifications") }}');
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.notifications && data.notifications.length > 0) {
+                            data.notifications.forEach(notification => {
+                                this.addNotification({
+                                    type: notification.type,
+                                    title: notification.title,
+                                    message: notification.message,
+                                    autoDismiss: notification.severity !== 'high'
+                                });
+                            });
                         }
-                    }, 5000);
-                };
-            }
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch notifications:', error);
+                }
+            }, 30000); // Poll every 30 seconds
         },
         
         addNotification(config) {
@@ -370,23 +376,6 @@ function notificationSystem() {
             }
         },
         
-        startPeriodicCheck() {
-            // Check for alerts every 30 seconds
-            setInterval(async () => {
-                try {
-                    const response = await fetch('{{ route("activity-logger.api.realtime") }}/alerts');
-                    const alerts = await response.json();
-                    
-                    alerts.forEach(alert => {
-                        if (!this.hasNotification(alert.id)) {
-                            this.handleRealtimeNotification(alert);
-                        }
-                    });
-                } catch (error) {
-                    console.error('Failed to check for alerts:', error);
-                }
-            }, 30000);
-        },
         
         hasNotification(alertId) {
             return this.allNotifications.some(n => n.alertId === alertId);
