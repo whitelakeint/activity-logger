@@ -106,7 +106,16 @@
         <!-- Traffic Over Time -->
         <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Traffic Over Time</h3>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Traffic Over Time</h3>
+                    <button x-on:click="refreshCharts()" 
+                            class="text-sm text-blue-600 hover:text-blue-500 font-medium flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
                 <div class="h-64">
                     <canvas id="trafficTimelineChart"></canvas>
                 </div>
@@ -320,10 +329,37 @@ function trafficAnalytics() {
     return {
         trafficTimelineChart: null,
         deviceDistributionChart: null,
+        trafficTimelineData: null,
+        deviceDistributionData: null,
         
-        init() {
+        async init() {
+            await this.loadInitialData();
             this.initCharts();
-            this.startRealTimeUpdates();
+            // Real-time updates disabled for performance
+            // this.startRealTimeUpdates();
+        },
+
+        async loadInitialData() {
+            try {
+                const response = await ActivityLogger.fetch('{{ route("activity-logger.api.charts") }}?type=traffic_trends');
+                const data = await response.json();
+                
+                if (data.traffic_timeline) {
+                    this.trafficTimelineData = data.traffic_timeline;
+                }
+                if (data.device_distribution) {
+                    this.deviceDistributionData = data.device_distribution;
+                }
+            } catch (error) {
+                console.error('Failed to load initial chart data:', error);
+                // Fall back to sample data if API fails
+                this.trafficTimelineData = {
+                    labels: this.generateTimeLabels(),
+                    page_views: this.generateTrafficData(),
+                    unique_visitors: this.generateUniqueVisitorData()
+                };
+                this.deviceDistributionData = [65, 30, 5];
+            }
         },
 
         initCharts() {
@@ -332,17 +368,17 @@ function trafficAnalytics() {
             this.trafficTimelineChart = new Chart(timelineCtx, {
                 type: 'line',
                 data: {
-                    labels: this.generateTimeLabels(),
+                    labels: this.trafficTimelineData ? this.trafficTimelineData.labels : this.generateTimeLabels(),
                     datasets: [{
                         label: 'Page Views',
-                        data: this.generateTrafficData(),
+                        data: this.trafficTimelineData ? this.trafficTimelineData.page_views : this.generateTrafficData(),
                         borderColor: 'rgb(59, 130, 246)',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         tension: 0.4,
                         fill: true
                     }, {
                         label: 'Unique Visitors',
-                        data: this.generateUniqueVisitorData(),
+                        data: this.trafficTimelineData ? this.trafficTimelineData.unique_visitors : this.generateUniqueVisitorData(),
                         borderColor: 'rgb(34, 197, 94)',
                         backgroundColor: 'rgba(34, 197, 94, 0.1)',
                         tension: 0.4,
@@ -386,7 +422,7 @@ function trafficAnalytics() {
                 data: {
                     labels: ['Desktop', 'Mobile', 'Tablet'],
                     datasets: [{
-                        data: [65, 30, 5],
+                        data: this.deviceDistributionData || [65, 30, 5],
                         backgroundColor: [
                             'rgb(59, 130, 246)',   // Blue for Desktop
                             'rgb(34, 197, 94)',    // Green for Mobile
@@ -434,22 +470,23 @@ function trafficAnalytics() {
         },
 
         async startRealTimeUpdates() {
-            setInterval(async () => {
-                try {
-                    const response = await ActivityLogger.fetch('{{ route("activity-logger.api.charts") }}?type=traffic_trends');
-                    const data = await response.json();
-                    
-                    if (data.traffic_timeline) {
-                        this.updateTrafficChart(data.traffic_timeline);
-                    }
-                    if (data.device_distribution) {
-                        this.deviceDistributionChart.data.datasets[0].data = data.device_distribution;
-                        this.deviceDistributionChart.update('none');
-                    }
-                } catch (error) {
-                    console.error('Failed to update traffic charts:', error);
-                }
-            }, 60000); // Update every minute
+            // Disabled for performance - users can refresh page for updated data
+            // setInterval(async () => {
+            //     try {
+            //         const response = await ActivityLogger.fetch('{{ route("activity-logger.api.charts") }}?type=traffic_trends');
+            //         const data = await response.json();
+            //         
+            //         if (data.traffic_timeline) {
+            //             this.updateTrafficChart(data.traffic_timeline);
+            //         }
+            //         if (data.device_distribution) {
+            //             this.deviceDistributionChart.data.datasets[0].data = data.device_distribution;
+            //             this.deviceDistributionChart.update('none');
+            //         }
+            //     } catch (error) {
+            //         console.error('Failed to update traffic charts:', error);
+            //     }
+            // }, 60000); // Update every minute
         },
 
         updateTrafficChart(data) {
@@ -460,6 +497,28 @@ function trafficAnalytics() {
                 this.trafficTimelineChart.data.datasets[1].data = data.unique_visitors;
             }
             this.trafficTimelineChart.update('none');
+        },
+
+        async refreshCharts() {
+            try {
+                ActivityLogger.showToast('Refreshing chart data...', 'info');
+                
+                const response = await ActivityLogger.fetch('{{ route("activity-logger.api.charts") }}?type=traffic_trends');
+                const data = await response.json();
+                
+                if (data.traffic_timeline) {
+                    this.updateTrafficChart(data.traffic_timeline);
+                }
+                if (data.device_distribution) {
+                    this.deviceDistributionChart.data.datasets[0].data = data.device_distribution;
+                    this.deviceDistributionChart.update('none');
+                }
+                
+                ActivityLogger.showToast('Charts refreshed successfully', 'success');
+            } catch (error) {
+                console.error('Failed to refresh charts:', error);
+                ActivityLogger.showToast('Failed to refresh charts', 'error');
+            }
         }
     }
 }

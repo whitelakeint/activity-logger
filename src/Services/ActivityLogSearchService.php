@@ -76,7 +76,11 @@ class ActivityLogSearchService
 
     public function searchErrors(array $filters = []): Collection
     {
-        $builder = ActivityLog::query()->whereNotNull('error_message');
+        $builder = ActivityLog::query()->where(function ($q) {
+            // Include records with error messages OR HTTP error status codes (4xx, 5xx)
+            $q->whereNotNull('error_message')
+              ->orWhere('response_code', '>=', 400);
+        });
 
         // Use request_date for date filtering if provided
         if (isset($filters['date'])) {

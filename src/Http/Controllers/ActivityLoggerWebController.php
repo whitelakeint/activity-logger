@@ -217,6 +217,8 @@ class ActivityLoggerWebController extends Controller
                 return response()->json($this->getPerformanceTrendsChart($dateRange));
             case 'error_trends':
                 return response()->json($this->getErrorTrendsChart($dateRange));
+            case 'traffic_trends':
+                return response()->json($this->getTrafficTrends($dateRange));
             default:
                 return response()->json(['error' => 'Unknown chart type'], 400);
         }
@@ -636,26 +638,127 @@ class ActivityLoggerWebController extends Controller
 
     protected function getRequestsTimeline(array $dateRange): array
     {
-        // Implementation for requests timeline chart
-        return [];
+        $logs = ActivityLogger::search($dateRange);
+        
+        // Group by hour for the last 24 hours
+        $timeline = [];
+        $uniqueVisitors = [];
+        
+        for ($i = 23; $i >= 0; $i--) {
+            $hour = now()->subHours($i);
+            $hourKey = $hour->format('H:i');
+            
+            $hourLogs = $logs->filter(function ($log) use ($hour) {
+                return $log->requested_at->format('Y-m-d H') === $hour->format('Y-m-d H');
+            });
+            
+            $timeline[] = $hourLogs->count();
+            $uniqueVisitors[] = $hourLogs->unique('ip_address')->count();
+        }
+        
+        return [
+            'labels' => collect(range(23, 0))->map(fn($i) => now()->subHours($i)->format('H:i'))->toArray(),
+            'page_views' => $timeline,
+            'unique_visitors' => $uniqueVisitors
+        ];
     }
 
     protected function getResponseCodesChart(array $dateRange): array
     {
-        // Implementation for response codes chart
-        return [];
+        $logs = ActivityLogger::search($dateRange);
+        
+        $codes = $logs->groupBy('response_code')->map->count();
+        
+        return [
+            'labels' => $codes->keys()->toArray(),
+            'data' => $codes->values()->toArray()
+        ];
     }
 
     protected function getPerformanceTrendsChart(array $dateRange): array
     {
-        // Implementation for performance trends chart
-        return [];
+        $logs = ActivityLogger::search($dateRange);
+        
+        // Group by day for performance trends
+        $trends = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = now()->subDays($i);
+            $dayLogs = $logs->filter(function ($log) use ($date) {
+                return $log->requested_at->format('Y-m-d') === $date->format('Y-m-d');
+            });
+            
+            $trends[] = [
+                'date' => $date->format('M d'),
+                'avg_response_time' => $dayLogs->avg('response_time') ?: 0,
+                'avg_memory' => $dayLogs->avg('memory_usage') ?: 0
+            ];
+        }
+        
+        return $trends;
     }
 
     protected function getErrorTrendsChart(array $dateRange): array
     {
-        // Implementation for error trends chart
-        return [];
+        $errors = $this->searchService->searchErrors($dateRange);
+        
+        // Group by hour for the last 24 hours
+        $timeline = [];
+        $criticalErrors = [];
+        
+        for ($i = 23; $i >= 0; $i--) {
+            $hour = now()->subHours($i);
+            $hourKey = $hour->format('H:i');
+            
+            $hourErrors = $errors->filter(function ($error) use ($hour) {
+                return $error->requested_at->format('Y-m-d H') === $hour->format('Y-m-d H');
+            });
+            
+            $timeline[] = $hourErrors->count();
+            $criticalErrors[] = $hourErrors->where('response_code', '>=', 500)->count();
+        }
+        
+        // Group errors by response code for distribution
+        $errorDistribution = $errors->groupBy('response_code')->map->count();
+        $distributionData = [
+            $errorDistribution->get(404, 0), // 404 Not Found
+            $errorDistribution->get(500, 0), // 500 Server Error
+            $errorDistribution->get(422, 0), // 422 Validation
+            $errorDistribution->get(403, 0), // 403 Forbidden
+            $errorDistribution->get(401, 0)  // 401 Unauthorized
+        ];
+        
+        return [
+            'error_timeline' => [
+                'labels' => collect(range(23, 0))->map(fn($i) => now()->subHours($i)->format('H:i'))->toArray(),
+                'total_errors' => $timeline,
+                'critical_errors' => $criticalErrors
+            ],
+            'error_distribution' => $distributionData
+        ];
+    }
+
+    protected function getTrafficTrends(array $dateRange): array
+    {
+        $logs = ActivityLogger::search($dateRange);
+        
+        // Get device distribution from real data
+        $devices = $logs->groupBy('device')->map->count();
+        $deviceData = [
+            'Desktop' => $devices->get('Desktop', 0),
+            'Mobile' => $devices->get('Mobile', 0), 
+            'Tablet' => $devices->get('Tablet', 0)
+        ];
+        
+        // Calculate percentages
+        $total = array_sum($deviceData);
+        if ($total > 0) {
+            $deviceData = array_map(fn($count) => round(($count / $total) * 100, 1), $deviceData);
+        }
+        
+        return [
+            'traffic_timeline' => $this->getRequestsTimeline($dateRange),
+            'device_distribution' => array_values($deviceData)
+        ];
     }
     
     /**

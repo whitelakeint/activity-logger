@@ -288,10 +288,14 @@ function errorMonitoring() {
     return {
         errorTimelineChart: null,
         errorDistributionChart: null,
+        errorTimelineData: null,
+        errorDistributionData: null,
         
-        init() {
+        async init() {
+            await this.loadInitialData();
             this.initCharts();
-            this.startRealTimeUpdates();
+            // Real-time updates disabled for performance
+            // this.startRealTimeUpdates();
         },
 
         initCharts() {
@@ -300,17 +304,17 @@ function errorMonitoring() {
             this.errorTimelineChart = new Chart(timelineCtx, {
                 type: 'line',
                 data: {
-                    labels: this.generateTimeLabels(),
+                    labels: this.errorTimelineData ? this.errorTimelineData.labels : this.generateTimeLabels(),
                     datasets: [{
                         label: 'Total Errors',
-                        data: this.generateErrorData(),
+                        data: this.errorTimelineData ? this.errorTimelineData.total_errors : this.generateErrorData(),
                         borderColor: 'rgb(239, 68, 68)',
                         backgroundColor: 'rgba(239, 68, 68, 0.1)',
                         tension: 0.4,
                         fill: true
                     }, {
                         label: '5xx Errors',
-                        data: this.generateCriticalErrorData(),
+                        data: this.errorTimelineData ? this.errorTimelineData.critical_errors : this.generateCriticalErrorData(),
                         borderColor: 'rgb(153, 27, 27)',
                         backgroundColor: 'rgba(153, 27, 27, 0.1)',
                         tension: 0.4,
@@ -361,7 +365,7 @@ function errorMonitoring() {
                 data: {
                     labels: ['404 Not Found', '500 Server Error', '422 Validation', '403 Forbidden', '401 Unauthorized'],
                     datasets: [{
-                        data: [45, 15, 20, 10, 10],
+                        data: this.errorDistributionData || [45, 15, 20, 10, 10],
                         backgroundColor: [
                             'rgb(251, 191, 36)',  // Yellow for 404
                             'rgb(239, 68, 68)',   // Red for 500
@@ -412,23 +416,48 @@ function errorMonitoring() {
             return Array.from({length: 24}, () => Math.floor(Math.random() * 5));
         },
 
-        async startRealTimeUpdates() {
-            setInterval(async () => {
-                try {
-                    const response = await ActivityLogger.fetch('{{ route("activity-logger.api.charts") }}?type=error_trends');
-                    const data = await response.json();
-                    
-                    if (data.error_timeline) {
-                        this.updateChartData(this.errorTimelineChart, data.error_timeline);
-                    }
-                    if (data.error_distribution) {
-                        this.errorDistributionChart.data.datasets[0].data = data.error_distribution;
-                        this.errorDistributionChart.update('none');
-                    }
-                } catch (error) {
-                    console.error('Failed to update error charts:', error);
+        async loadInitialData() {
+            try {
+                const response = await ActivityLogger.fetch('{{ route("activity-logger.api.charts") }}?type=error_trends');
+                const data = await response.json();
+                
+                if (data.error_timeline) {
+                    this.errorTimelineData = data.error_timeline;
                 }
-            }, 60000); // Update every minute
+                if (data.error_distribution) {
+                    this.errorDistributionData = data.error_distribution;
+                }
+            } catch (error) {
+                console.error('Failed to load initial error chart data:', error);
+                // Fall back to sample data if API fails
+                this.errorTimelineData = {
+                    labels: this.generateTimeLabels(),
+                    total_errors: this.generateErrorData(),
+                    critical_errors: this.generateCriticalErrorData()
+                };
+                this.errorDistributionData = [45, 15, 20, 10, 10];
+            }
+        },
+
+        async startRealTimeUpdates() {
+            // Real-time updates disabled for performance
+            // Users can refresh the page to get updated data
+            // setInterval(async () => {
+            //     try {
+            //         const response = await ActivityLogger.fetch('{{ route("activity-logger.api.charts") }}?type=error_trends');
+            //         const data = await response.json();
+            //         
+            //         if (data.error_timeline) {
+            //             this.updateChartData(this.errorTimelineChart, data.error_timeline);
+            //         }
+            //         if (data.error_distribution) {
+            //             this.errorDistributionChart.data.datasets[0].data = data.error_distribution;
+            //             this.errorDistributionChart.update('none');
+            //         }
+            //     } catch (error) {
+            //         console.error('Failed to update error charts:', error);
+            //     }
+            // }, 60000); // Update every minute
         },
 
         updateChartData(chart, newData) {
@@ -444,11 +473,21 @@ function errorMonitoring() {
         async refreshErrors() {
             try {
                 ActivityLogger.showToast('Refreshing error data...', 'info');
-                // In a real implementation, this would reload the error data
-                setTimeout(() => {
-                    ActivityLogger.showToast('Error data refreshed', 'success');
-                }, 1000);
+                
+                const response = await ActivityLogger.fetch('{{ route("activity-logger.api.charts") }}?type=error_trends');
+                const data = await response.json();
+                
+                if (data.error_timeline) {
+                    this.updateChartData(this.errorTimelineChart, data.error_timeline);
+                }
+                if (data.error_distribution) {
+                    this.errorDistributionChart.data.datasets[0].data = data.error_distribution;
+                    this.errorDistributionChart.update('none');
+                }
+                
+                ActivityLogger.showToast('Error data refreshed successfully', 'success');
             } catch (error) {
+                console.error('Failed to refresh error data:', error);
                 ActivityLogger.showToast('Failed to refresh error data', 'error');
             }
         }

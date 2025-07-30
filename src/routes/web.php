@@ -19,6 +19,10 @@ Route::prefix('activity-logger')->name('activity-logger.')->group(function () {
     Route::get('/users/{id}', [ActivityLoggerWebController::class, 'showUser'])->name('users.show');
     Route::get('/reports', [ActivityLoggerWebController::class, 'reports'])->name('reports');
     
+    // Export and Download Routes
+    Route::post('/export', [ActivityLoggerWebController::class, 'export'])->name('export');
+    Route::get('/download/{filename}', [ActivityLoggerWebController::class, 'download'])->name('download');
+    
     // AJAX API Routes for Dashboard
     Route::prefix('api')->group(function () {
         Route::get('realtime-stats', [ActivityLoggerWebController::class, 'realtimeStats'])->name('api.realtime');
