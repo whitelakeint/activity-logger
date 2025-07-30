@@ -228,19 +228,54 @@ class ActivityLoggerWebController extends Controller
     public function export(Request $request): JsonResponse
     {
         $filters = $this->buildFilters($request);
-        $format = $request->get('format', 'json');
+        $format = $request->get('format', 'csv');
+        $reportType = $request->get('report_type', 'logs');
+        $reportName = $request->get('report_name', 'Activity Report');
         
         try {
-            $data = ActivityLogger::export($filters, $format);
+            // Generate different types of reports based on report_type
+            switch ($reportType) {
+                case 'daily_summary':
+                    $data = $this->generateDailySummary($filters);
+                    $filename = 'daily_summary_' . now()->format('Y-m-d') . '.' . $format;
+                    break;
+                    
+                case 'error_report':
+                    $data = $this->generateErrorReport($filters);
+                    $filename = 'error_report_' . now()->format('Y-m-d') . '.' . $format;
+                    break;
+                    
+                case 'performance_report':
+                    $data = $this->generatePerformanceReport($filters);
+                    $filename = 'performance_report_' . now()->format('Y-m-d') . '.' . $format;
+                    break;
+                    
+                case 'user_activity':
+                    $data = $this->generateUserActivityReport($filters);
+                    $filename = 'user_activity_' . now()->format('Y-m-d') . '.' . $format;
+                    break;
+                    
+                case 'custom':
+                    $data = $this->generateCustomReport($request, $filters);
+                    $filename = \Str::slug($reportName) . '_' . now()->format('Y-m-d') . '.' . $format;
+                    break;
+                    
+                default:
+                    $data = ActivityLogger::search($filters);
+                    $filename = 'activity_logs_' . now()->format('Y-m-d_H-i-s') . '.' . $format;
+                    break;
+            }
             
             // Store the exported data in session for download
-            session(['export_data' => $data, 'export_format' => $format]);
+            session([
+                'export_data' => $data, 
+                'export_format' => $format,
+                'export_filename' => $filename
+            ]);
             
             return response()->json([
                 'success' => true,
-                'download_url' => route('activity-logger.download', [
-                    'filename' => 'activity_logs_' . now()->format('Y-m-d_H-i-s') . '.' . $format
-                ])
+                'download_url' => route('activity-logger.download', ['filename' => $filename])
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -256,14 +291,15 @@ class ActivityLoggerWebController extends Controller
     public function download($filename)
     {
         $data = session('export_data');
-        $format = session('export_format', 'json');
+        $format = session('export_format', 'csv');
+        $storedFilename = session('export_filename', $filename);
         
         if (!$data) {
             abort(404, 'Export data not found');
         }
         
         // Clear the session data
-        session()->forget(['export_data', 'export_format']);
+        session()->forget(['export_data', 'export_format', 'export_filename']);
         
         $headers = [
             'Content-Type' => $format === 'json' ? 'application/json' : 'text/csv',
@@ -668,5 +704,175 @@ class ActivityLoggerWebController extends Controller
         }
         
         return $notifications;
+    }
+    
+    /**
+     * Generate daily summary report
+     */
+    protected function generateDailySummary(array $filters): array
+    {
+        $stats = ActivityLogger::getStatistics($filters);
+        
+        return [
+            [
+                'Report Type' => 'Daily Summary',
+                'Date Range' => ($filters['start_date'] ?? 'N/A') . ' to ' . ($filters['end_date'] ?? 'N/A'),
+                'Total Requests' => $stats['total_requests'] ?? 0,
+                'Unique Users' => $stats['unique_users'] ?? 0,
+                'Unique IPs' => $stats['unique_ips'] ?? 0,
+                'Success Rate' => ($stats['success_rate'] ?? 0) . '%',
+                'Error Rate' => (100 - ($stats['success_rate'] ?? 100)) . '%',
+                'Average Response Time' => round($stats['average_response_time'] ?? 0, 2) . 'ms',
+                'Average Memory Usage' => round(($stats['average_memory'] ?? 0) / (1024 * 1024), 2) . 'MB',
+                'Generated At' => now()->toDateTimeString()
+            ]
+        ];
+    }
+    
+    /**
+     * Generate error report
+     */
+    protected function generateErrorReport(array $filters): array
+    {
+        $errors = $this->searchService->searchErrors($filters)->take(1000);
+        
+        return $errors->map(function ($error) {
+            return [
+                'ID' => $error->id,
+                'Date' => $error->requested_at->toDateTimeString(),
+                'Method' => $error->method,
+                'URL' => $error->url,
+                'Response Code' => $error->response_code,
+                'Error Message' => $error->error_message ?? 'HTTP ' . $error->response_code . ' Error',
+                'User ID' => $error->user_id,
+                'IP Address' => $error->ip_address,
+                'Browser' => $error->browser,
+                'Platform' => $error->platform,
+                'Response Time' => $error->response_time . 'ms'
+            ];
+        })->toArray();
+    }
+    
+    /**
+     * Generate performance report
+     */
+    protected function generatePerformanceReport(array $filters): array
+    {
+        $logs = ActivityLogger::search($filters)->sortByDesc('response_time')->take(1000);
+        
+        return $logs->map(function ($log) {
+            return [
+                'ID' => $log->id,
+                'Date' => $log->requested_at->toDateTimeString(),
+                'Method' => $log->method,
+                'URL' => $log->url,
+                'Response Code' => $log->response_code,
+                'Response Time' => $log->response_time . 'ms',
+                'Memory Usage' => round(($log->memory_usage ?? 0) / (1024 * 1024), 2) . 'MB',
+                'Query Count' => $log->query_count ?? 0,
+                'Query Time' => ($log->query_time ?? 0) . 'ms',
+                'User ID' => $log->user_id,
+                'IP Address' => $log->ip_address
+            ];
+        })->toArray();
+    }
+    
+    /**
+     * Generate user activity report
+     */
+    protected function generateUserActivityReport(array $filters): array
+    {
+        $logs = ActivityLogger::search($filters)->whereNotNull('user_id')->take(1000);
+        
+        return $logs->map(function ($log) {
+            return [
+                'ID' => $log->id,
+                'User ID' => $log->user_id,
+                'User Name' => $log->user_name ?? 'N/A',
+                'User Email' => $log->user_email ?? 'N/A',
+                'Date' => $log->requested_at->toDateTimeString(),
+                'Method' => $log->method,
+                'URL' => $log->url,
+                'Response Code' => $log->response_code,
+                'Response Time' => $log->response_time . 'ms',
+                'IP Address' => $log->ip_address,
+                'Browser' => $log->browser,
+                'Platform' => $log->platform,
+                'Device' => $log->device,
+                'Country' => $log->country ?? 'Unknown'
+            ];
+        })->toArray();
+    }
+    
+    /**
+     * Generate custom report
+     */
+    protected function generateCustomReport(Request $request, array $filters): array
+    {
+        $metrics = explode(',', $request->get('metrics', 'requests,users,errors'));
+        $logs = ActivityLogger::search($filters)->take(1000);
+        
+        $data = [];
+        
+        // Add summary row
+        $stats = ActivityLogger::getStatistics($filters);
+        $summary = [
+            'Report Type' => 'Custom Report',
+            'Report Name' => $request->get('report_name', 'Custom Report'),
+            'Date Range' => ($filters['start_date'] ?? 'N/A') . ' to ' . ($filters['end_date'] ?? 'N/A'),
+            'Generated At' => now()->toDateTimeString()
+        ];
+        
+        if (in_array('requests', $metrics)) {
+            $summary['Total Requests'] = $stats['total_requests'] ?? 0;
+        }
+        if (in_array('users', $metrics)) {
+            $summary['Unique Users'] = $stats['unique_users'] ?? 0;
+        }
+        if (in_array('errors', $metrics)) {
+            $summary['Error Rate'] = (100 - ($stats['success_rate'] ?? 100)) . '%';
+        }
+        if (in_array('performance', $metrics)) {
+            $summary['Average Response Time'] = round($stats['average_response_time'] ?? 0, 2) . 'ms';
+        }
+        
+        $data[] = $summary;
+        $data[] = []; // Empty row for separation
+        
+        // Add detailed data
+        foreach ($logs as $log) {
+            $row = [
+                'ID' => $log->id,
+                'Date' => $log->requested_at->toDateTimeString(),
+                'Method' => $log->method,
+                'URL' => $log->url,
+                'Response Code' => $log->response_code
+            ];
+            
+            if (in_array('users', $metrics)) {
+                $row['User ID'] = $log->user_id;
+                $row['User Name'] = $log->user_name ?? 'N/A';
+            }
+            if (in_array('performance', $metrics)) {
+                $row['Response Time'] = $log->response_time . 'ms';
+                $row['Memory Usage'] = round(($log->memory_usage ?? 0) / (1024 * 1024), 2) . 'MB';
+            }
+            if (in_array('geographic', $metrics)) {
+                $row['Country'] = $log->country ?? 'Unknown';
+                $row['City'] = $log->city ?? 'Unknown';
+            }
+            if (in_array('devices', $metrics)) {
+                $row['Device'] = $log->device;
+                $row['Platform'] = $log->platform;
+            }
+            if (in_array('browsers', $metrics)) {
+                $row['Browser'] = $log->browser;
+            }
+            
+            $row['IP Address'] = $log->ip_address;
+            $data[] = $row;
+        }
+        
+        return $data;
     }
 }

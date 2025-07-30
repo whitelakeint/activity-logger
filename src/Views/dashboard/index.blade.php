@@ -389,29 +389,14 @@ function dashboard() {
             return Array.from({length: 24}, () => Math.floor(Math.random() * 100) + 10);
         },
 
+        // Real-time updates disabled for performance
         startRealTimeUpdates() {
-            setInterval(() => {
-                this.updateStats();
-            }, 30000); // Update every 30 seconds
+            // Disabled - was causing performance issues and accumulating notifications
+            // Users can refresh the page to get updated data
         },
 
         async updateStats() {
-            try {
-                const response = await ActivityLogger.fetch('{{ route("activity-logger.api.realtime") }}');
-                const data = await response.json();
-                
-                this.stats = {
-                    total_requests: data.requests_last_hour || this.stats.total_requests,
-                    unique_users: data.current_active_users || this.stats.unique_users,
-                    error_rate: ((data.errors_last_hour / data.requests_last_hour) * 100).toFixed(1) || this.stats.error_rate,
-                    avg_response_time: data.avg_response_time || this.stats.avg_response_time
-                };
-                
-                ActivityLogger.showToast('Dashboard updated', 'success');
-            } catch (error) {
-                console.error('Failed to update real-time stats:', error);
-                ActivityLogger.showToast('Failed to update dashboard', 'error');
-            }
+            // Disabled - real-time updates removed for better performance
         },
         
         handleFiltersApplied(event) {

@@ -289,8 +289,10 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div class="flex items-center space-x-2">
-                                <button class="text-indigo-600 hover:text-indigo-900">Download</button>
-                                <button class="text-blue-600 hover:text-blue-900">View</button>
+                                <button x-on:click="downloadSampleReport('{{ ['daily_summary', 'error_report', 'performance_report', 'user_activity'][array_rand(['daily_summary', 'error_report', 'performance_report', 'user_activity'])] }}')" 
+                                        class="text-indigo-600 hover:text-indigo-900">Download</button>
+                                <button x-on:click="ActivityLogger.showToast('View functionality would show report preview', 'info')" 
+                                        class="text-blue-600 hover:text-blue-900">View</button>
                             </div>
                         </td>
                     </tr>
@@ -342,27 +344,29 @@ function reportGenerator() {
             try {
                 ActivityLogger.showToast('Generating ' + type + ' report...', 'info');
                 
-                const response = await ActivityLogger.fetch('{{ route("activity-logger.api.export") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        type: type,
-                        format: 'pdf'
-                    })
+                // Build export parameters
+                const params = new URLSearchParams({
+                    report_type: type,
+                    format: 'csv',
+                    start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    end_date: new Date().toISOString().split('T')[0]
+                });
+                
+                const response = await ActivityLogger.fetch('{{ route("activity-logger.export") }}?' + params.toString(), {
+                    method: 'POST'
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
                     ActivityLogger.showToast('Report generated successfully', 'success');
-                    // In a real implementation, this would trigger a download
-                    this.downloadReport(data.download_url);
+                    // Immediately download the report
+                    window.location.href = data.download_url;
                 } else {
                     throw new Error(data.error || 'Report generation failed');
                 }
             } catch (error) {
+                console.error('Report generation error:', error);
                 ActivityLogger.showToast('Failed to generate report: ' + error.message, 'error');
             }
         },
@@ -381,12 +385,18 @@ function reportGenerator() {
             try {
                 ActivityLogger.showToast('Generating custom report...', 'info');
                 
-                const response = await ActivityLogger.fetch('{{ route("activity-logger.api.export") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(this.customReport)
+                // Build export parameters for custom report
+                const params = new URLSearchParams({
+                    report_type: 'custom',
+                    format: this.customReport.format || 'csv',
+                    start_date: this.customReport.dateRange === 'custom' ? this.customReport.startDate : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    end_date: this.customReport.dateRange === 'custom' ? this.customReport.endDate : new Date().toISOString().split('T')[0],
+                    report_name: this.customReport.name,
+                    metrics: this.customReport.metrics.join(',')
+                });
+                
+                const response = await ActivityLogger.fetch('{{ route("activity-logger.export") }}?' + params.toString(), {
+                    method: 'POST'
                 });
                 
                 const data = await response.json();
@@ -396,12 +406,14 @@ function reportGenerator() {
                     if (this.customReport.schedule) {
                         ActivityLogger.showToast('Report scheduled for ' + this.customReport.schedule + ' delivery', 'info');
                     }
-                    this.downloadReport(data.download_url);
+                    // Immediately download the report
+                    window.location.href = data.download_url;
                     this.resetCustomReport();
                 } else {
                     throw new Error(data.error || 'Custom report generation failed');
                 }
             } catch (error) {
+                console.error('Custom report generation error:', error);  
                 ActivityLogger.showToast('Failed to generate custom report: ' + error.message, 'error');
             }
         },
@@ -494,6 +506,11 @@ function reportGenerator() {
             } catch (error) {
                 ActivityLogger.showToast('Failed to delete scheduled report', 'error');
             }
+        },
+
+        async downloadSampleReport(reportType) {
+            // This will download a sample report to demonstrate functionality
+            await this.generateReport(reportType);
         }
     }
 }

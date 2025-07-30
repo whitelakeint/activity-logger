@@ -43,7 +43,8 @@
     <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
 
     <!-- Include Components -->
-    @include('activity-logger::components.notifications')
+    {{-- Notifications disabled for performance - was causing accumulating numbers issue --}}
+    {{-- @include('activity-logger::components.notifications') --}}
     @include('activity-logger::components.mobile-optimization')
 
     @stack('scripts')
