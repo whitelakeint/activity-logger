@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use ActivityLogger\Models\ActivityLog;
+use Exception;
 use Jenssegers\Agent\Agent;
 use Throwable;
 
@@ -13,6 +14,11 @@ class ActivityLoggerMiddleware
 {
     protected $startTime;
     protected $startMemory;
+
+    public function __construct()
+    {
+        $this->middleware('auth');
+    }
 
     public function handle(Request $request, Closure $next)
     {
@@ -48,12 +54,22 @@ class ActivityLoggerMiddleware
         $responseTime = (microtime(true) - $this->startTime) * 1000;
         $memoryUsage = memory_get_usage() - $this->startMemory;
         $requestTime = now();
-        
-        // Get current user information
-        $user = Auth::user();
+        $user_id = null;
+        $user = null;
+        try {
+            // Get current user information
+            $guardName = config('auth.defaults.guard');
+            $user = Auth::guard($guardName)->user();
+
+            if ($request->bearerToken()) {
+                $user = Auth::guard('api')->user();
+            }
+        } catch (Exception $e) {
+            // Nothing to do in here
+        }
         
         $data = [
-            'user_id' => Auth::id(),
+            'user_id' => $user ? $user->id : null;,
             'user_name' => $user ? ($user->name ?? null) : null,
             'user_email' => $user ? ($user->email ?? null) : null,
             'session_id' => session()->getId(),
