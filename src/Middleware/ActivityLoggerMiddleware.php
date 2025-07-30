@@ -8,12 +8,20 @@ use Illuminate\Support\Facades\Auth;
 use ActivityLogger\Models\ActivityLog;
 use Exception;
 use Jenssegers\Agent\Agent;
+use Illuminate\Auth\AuthManager;
 use Throwable;
 
 class ActivityLoggerMiddleware
 {
     protected $startTime;
     protected $startMemory;
+
+    protected AuthManager $auth;
+
+    public function __construct(AuthManager $auth)
+    {
+        $this->auth = $auth;
+    }
 
     public function handle(Request $request, Closure $next)
     {
@@ -53,8 +61,7 @@ class ActivityLoggerMiddleware
         $user = null;
         try {
             // Get current user information
-            $guardName = config('auth.defaults.guard');
-            $user = Auth::guard($guardName)->user();
+            $user = $request->user();
 
             if ($request->bearerToken()) {
                 $user = Auth::guard('api')->user();
