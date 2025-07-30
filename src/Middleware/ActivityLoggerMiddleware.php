@@ -49,8 +49,13 @@ class ActivityLoggerMiddleware
         $memoryUsage = memory_get_usage() - $this->startMemory;
         $requestTime = now();
         
+        // Get current user information
+        $user = Auth::user();
+        
         $data = [
             'user_id' => Auth::id(),
+            'user_name' => $user ? ($user->name ?? null) : null,
+            'user_email' => $user ? ($user->email ?? null) : null,
             'session_id' => session()->getId(),
             'ip_address' => $request->ip(),
             'request_date' => $requestTime->toDateString(),
