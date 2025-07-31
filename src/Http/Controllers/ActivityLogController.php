@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use ActivityLogger\Http\Resources\ActivityLogResource;
 use ActivityLogger\Http\Resources\ActivityLogCollection;
+use ActivityLogger\Http\Resources\ActivityLogListResource;
 use ActivityLogger\Facades\ActivityLogger;
 
 class ActivityLogController extends Controller
@@ -18,7 +19,26 @@ class ActivityLogController extends Controller
         
         $logs = ActivityLogger::search($filters, $perPage);
         
-        return (new ActivityLogCollection($logs))->response();
+        // Use list resource for listing to optimize response size
+        return response()->json([
+            'data' => ActivityLogListResource::collection($logs->items()),
+            'links' => [
+                'first' => $logs->url(1),
+                'last' => $logs->url($logs->lastPage()),
+                'prev' => $logs->previousPageUrl(),
+                'next' => $logs->nextPageUrl(),
+            ],
+            'meta' => [
+                'current_page' => $logs->currentPage(),
+                'from' => $logs->firstItem(),
+                'last_page' => $logs->lastPage(),
+                'links' => $this->generatePaginationLinks($logs),
+                'path' => $request->url(),
+                'per_page' => $logs->perPage(),
+                'to' => $logs->lastItem(),
+                'total' => $logs->total(),
+            ],
+        ]);
     }
 
     public function show(Request $request, $id): JsonResponse
@@ -229,5 +249,62 @@ class ActivityLogController extends Controller
             default:
                 return 'application/json';
         }
+    }
+
+    protected function generatePaginationLinks($paginator): array
+    {
+        $links = [];
+        
+        // Previous link
+        if ($paginator->currentPage() > 1) {
+            $links[] = [
+                'url' => $paginator->previousPageUrl(),
+                'label' => '&laquo; Previous',
+                'active' => false,
+            ];
+        } else {
+            $links[] = [
+                'url' => null,
+                'label' => '&laquo; Previous',
+                'active' => false,
+            ];
+        }
+        
+        // Page number links
+        $elements = $paginator->linkCollection();
+        foreach ($elements as $element) {
+            if (is_string($element)) {
+                $links[] = [
+                    'url' => null,
+                    'label' => '...',
+                    'active' => false,
+                ];
+            } elseif (is_array($element)) {
+                foreach ($element as $page => $url) {
+                    $links[] = [
+                        'url' => $url,
+                        'label' => $page,
+                        'active' => $paginator->currentPage() == $page,
+                    ];
+                }
+            }
+        }
+        
+        // Next link
+        if ($paginator->hasMorePages()) {
+            $links[] = [
+                'url' => $paginator->nextPageUrl(),
+                'label' => 'Next &raquo;',
+                'active' => false,
+            ];
+        } else {
+            $links[] = [
+                'url' => null,
+                'label' => 'Next &raquo;',
+                'active' => false,
+            ];
+        }
+        
+        return $links;
     }
 }

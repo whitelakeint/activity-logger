@@ -21,6 +21,10 @@ return [
     
     'log_errors' => env('ACTIVITY_LOGGER_LOG_ERRORS', true),
 
+    'log_queries' => env('ACTIVITY_LOGGER_LOG_QUERIES', true),
+    
+    'log_query_details' => env('ACTIVITY_LOGGER_LOG_QUERY_DETAILS', false),
+
     'max_body_size' => env('ACTIVITY_LOGGER_MAX_BODY_SIZE', 10000),
 
     'skip_urls' => [

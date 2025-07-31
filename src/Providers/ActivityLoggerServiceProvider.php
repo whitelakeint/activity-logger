@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use ActivityLogger\Middleware\ActivityLoggerMiddleware;
 use ActivityLogger\Repositories\ActivityLogRepository;
 use ActivityLogger\ActivityLogger;
+use ActivityLogger\Listeners\QueryLogListener;
+use Illuminate\Database\Events\QueryExecuted;
 
 class ActivityLoggerServiceProvider extends ServiceProvider
 {
@@ -32,6 +34,11 @@ class ActivityLoggerServiceProvider extends ServiceProvider
             return new \ActivityLogger\Services\ActivityLogSearchService(
                 $app->make(ActivityLogRepository::class)
             );
+        });
+
+        // Register QueryLogListener as singleton
+        $this->app->singleton(QueryLogListener::class, function ($app) {
+            return new QueryLogListener();
         });
     }
 
@@ -73,6 +80,13 @@ class ActivityLoggerServiceProvider extends ServiceProvider
         }
 
         $this->registerCommands();
+
+        // Register query listener if enabled
+        if (config('activity-logger.log_queries', true)) {
+            $this->app['events']->listen(QueryExecuted::class, function (QueryExecuted $event) {
+                $this->app->make(QueryLogListener::class)->handle($event);
+            });
+        }
     }
 
     protected function registerCommands()

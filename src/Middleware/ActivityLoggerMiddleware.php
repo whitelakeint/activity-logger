@@ -10,6 +10,7 @@ use Exception;
 use Jenssegers\Agent\Agent;
 use Illuminate\Auth\AuthManager;
 use Throwable;
+use ActivityLogger\Listeners\QueryLogListener;
 
 class ActivityLoggerMiddleware
 {
@@ -31,6 +32,11 @@ class ActivityLoggerMiddleware
 
         $this->startTime = microtime(true);
         $this->startMemory = memory_get_usage();
+
+        // Reset query listener before request
+        if (config('activity-logger.log_queries', true)) {
+            app(QueryLogListener::class)->reset();
+        }
 
         try {
             $response = $next($request);
@@ -90,6 +96,7 @@ class ActivityLoggerMiddleware
             'memory_usage' => $memoryUsage,
             'query_count' => $this->getQueryCount(),
             'query_time' => $this->getQueryTime(),
+            'queries' => $this->getQueries(),
             'browser' => $agent->browser(),
             'platform' => $agent->platform(),
             'device' => $this->getDevice($agent),
@@ -280,8 +287,8 @@ class ActivityLoggerMiddleware
 
     protected function getQueryCount(): int
     {
-        if (class_exists('\Illuminate\Database\Events\QueryExecuted')) {
-            return count(\DB::getQueryLog());
+        if (config('activity-logger.log_queries', true)) {
+            return app(QueryLogListener::class)->getQueryCount();
         }
 
         return 0;
@@ -289,11 +296,19 @@ class ActivityLoggerMiddleware
 
     protected function getQueryTime(): float
     {
-        if (class_exists('\Illuminate\Database\Events\QueryExecuted')) {
-            $queries = \DB::getQueryLog();
-            return collect($queries)->sum('time');
+        if (config('activity-logger.log_queries', true)) {
+            return app(QueryLogListener::class)->getTotalQueryTime();
         }
 
         return 0;
+    }
+
+    protected function getQueries(): ?array
+    {
+        if (config('activity-logger.log_queries', true) && config('activity-logger.log_query_details', false)) {
+            return app(QueryLogListener::class)->getQueries();
+        }
+
+        return null;
     }
 }

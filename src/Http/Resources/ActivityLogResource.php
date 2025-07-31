@@ -36,6 +36,7 @@ class ActivityLogResource extends JsonResource
             'memory_usage' => $this->memory_usage,
             'query_count' => $this->query_count,
             'query_time' => $this->query_time,
+            'queries' => $this->when($this->shouldShowQueries(), $this->queries),
             'country' => $this->country,
             'city' => $this->city,
             'timezone' => $this->timezone,
@@ -70,5 +71,10 @@ class ActivityLogResource extends JsonResource
     protected function shouldShowTrace(): bool
     {
         return request()->has('include_trace') && request()->get('include_trace') === 'true';
+    }
+
+    protected function shouldShowQueries(): bool
+    {
+        return request()->has('include_queries') && request()->get('include_queries') === 'true';
     }
 }
