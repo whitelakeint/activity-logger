@@ -81,12 +81,12 @@ class ActivityLoggerServiceProvider extends ServiceProvider
 
         $this->registerCommands();
 
-        // Register query listener if enabled
-        if (config('activity-logger.log_queries', true)) {
-            $this->app['events']->listen(QueryExecuted::class, function (QueryExecuted $event) {
+        // Register query listener - always register but check config in listener
+        $this->app['events']->listen(QueryExecuted::class, function (QueryExecuted $event) {
+            if (config('activity-logger.log_queries', true)) {
                 $this->app->make(QueryLogListener::class)->handle($event);
-            });
-        }
+            }
+        });
     }
 
     protected function registerCommands()

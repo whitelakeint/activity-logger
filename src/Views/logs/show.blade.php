@@ -83,8 +83,21 @@
                             </tr>
                             <tr>
                                 <th>Query Count</th>
-                                <td>{{ $log->query_count ?? 0 }} queries</td>
+                                <td>
+                                    {{ $log->query_count ?? 0 }} queries
+                                    @if($log->query_count > 0 && $log->queries && count($log->queries) > 0)
+                                        <button class="btn btn-sm btn-outline-primary ml-2" data-toggle="modal" data-target="#queriesModal">
+                                            <i class="fas fa-database"></i> View Queries
+                                        </button>
+                                    @endif
+                                </td>
                             </tr>
+                            @if($log->query_time)
+                            <tr>
+                                <th>Total Query Time</th>
+                                <td>{{ number_format($log->query_time, 2) }}ms</td>
+                            </tr>
+                            @endif
                         </table>
                     </div>
                 </div>
@@ -425,6 +438,118 @@ Host: {{ parse_url($log->url, PHP_URL_HOST) }}
     @endif
 </div>
 
+<!-- Queries Modal -->
+@if(isset($log) && $log->queries && count($log->queries) > 0)
+<div class="modal fade" id="queriesModal" tabindex="-1" role="dialog" aria-labelledby="queriesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="queriesModalLabel">
+                    <i class="fas fa-database"></i> Database Queries
+                    <span class="badge badge-primary ml-2">{{ count($log->queries) }}</span>
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="text-muted mb-0">Total Queries</h6>
+                                <h3 class="mb-0">{{ count($log->queries) }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="text-muted mb-0">Total Time</h6>
+                                <h3 class="mb-0">{{ number_format($log->query_time, 2) }}ms</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="text-muted mb-0">Average Time</h6>
+                                <h3 class="mb-0">{{ number_format($log->query_time / count($log->queries), 2) }}ms</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th width="5%">#</th>
+                                <th width="75%">Query</th>
+                                <th width="10%">Time</th>
+                                <th width="10%">Bindings</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($log->queries as $index => $query)
+                                <tr>
+                                    <td>{{ $index + 1 }}</td>
+                                    <td>
+                                        <code class="d-block mb-2" style="white-space: pre-wrap; word-break: break-word;">{{ $query['sql'] }}</code>
+                                        @if(!empty($query['bindings']))
+                                            <button class="btn btn-sm btn-outline-info" type="button" data-toggle="collapse" data-target="#bindings-{{ $index }}" aria-expanded="false">
+                                                <i class="fas fa-link"></i> Show Bindings
+                                            </button>
+                                            <div class="collapse mt-2" id="bindings-{{ $index }}">
+                                                <div class="card card-body bg-light">
+                                                    <strong>Bindings:</strong>
+                                                    <pre class="mb-0">{{ json_encode($query['bindings'], JSON_PRETTY_PRINT) }}</pre>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-{{ $query['time'] > 100 ? 'danger' : ($query['time'] > 50 ? 'warning' : 'success') }}">
+                                            {{ number_format($query['time'], 2) }}ms
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if(!empty($query['bindings']))
+                                            <span class="badge badge-info">{{ count($query['bindings']) }}</span>
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                
+                @php
+                    $slowQueries = collect($log->queries)->filter(function($query) {
+                        return $query['time'] > 100;
+                    });
+                @endphp
+                
+                @if($slowQueries->count() > 0)
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Performance Warning:</strong> {{ $slowQueries->count() }} slow {{ Str::plural('query', $slowQueries->count()) }} detected (>100ms)
+                    </div>
+                @endif
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="exportQueries()">
+                    <i class="fas fa-download"></i> Export Queries
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 <script>
 function copyToClipboard(elementId) {
     const element = document.getElementById(elementId);
@@ -448,6 +573,31 @@ function copyToClipboard(elementId) {
 
 function copyReproductionCommand() {
     copyToClipboard('curl-command');
+}
+
+function exportQueries() {
+    @if(isset($log) && $log->queries)
+        const queries = @json($log->queries);
+        const logId = {{ $log->id }};
+        const exportData = {
+            log_id: logId,
+            url: '{{ $log->url }}',
+            timestamp: '{{ $log->requested_at }}',
+            total_queries: queries.length,
+            total_time: {{ $log->query_time ?? 0 }},
+            queries: queries
+        };
+        
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        
+        const exportFileDefaultName = `activity_log_${logId}_queries.json`;
+        
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+    @endif
 }
 </script>
 @endsection
