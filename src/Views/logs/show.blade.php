@@ -86,7 +86,7 @@
                                 <td>
                                     {{ $log->query_count ?? 0 }} queries
                                     @if($log->query_count > 0 && $log->queries && count($log->queries) > 0)
-                                        <button class="btn btn-sm btn-outline-primary ml-2" data-toggle="modal" data-target="#queriesModal">
+                                        <button class="btn btn-sm btn-outline-primary ml-2" onclick="showQueriesModal()">
                                             <i class="fas fa-database"></i> View Queries
                                         </button>
                                     @endif
@@ -440,109 +440,130 @@ Host: {{ parse_url($log->url, PHP_URL_HOST) }}
 
 <!-- Queries Modal -->
 @if(isset($log) && $log->queries && count($log->queries) > 0)
-<div class="modal fade" id="queriesModal" tabindex="-1" role="dialog" aria-labelledby="queriesModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="queriesModalLabel">
-                    <i class="fas fa-database"></i> Database Queries
-                    <span class="badge badge-primary ml-2">{{ count($log->queries) }}</span>
-                </h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+<div id="queriesModal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Background overlay -->
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-0 transition-opacity duration-300" aria-hidden="true" onclick="hideQueriesModal()"></div>
+
+        <!-- Modal panel -->
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all duration-300 opacity-0 translate-y-4 sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4" id="modal-title">
+                            <svg class="inline w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4-3.582-4-8-4-8 1.79-8 4z"></path>
+                            </svg>
+                            Database Queries
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 ml-2">
+                                {{ count($log->queries) }}
+                            </span>
+                        </h3>
+                        
+                        <!-- Stats Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-500">Total Queries</p>
+                                <p class="text-2xl font-semibold text-gray-900">{{ count($log->queries) }}</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-500">Total Time</p>
+                                <p class="text-2xl font-semibold text-gray-900">{{ number_format($log->query_time, 2) }}ms</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-500">Average Time</p>
+                                <p class="text-2xl font-semibold text-gray-900">{{ number_format($log->query_time / count($log->queries), 2) }}ms</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Queries Table -->
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Query</th>
+                                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bindings</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    @foreach($log->queries as $index => $query)
+                                        <tr>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{{ $index + 1 }}</td>
+                                            <td class="px-3 py-4 text-sm text-gray-900">
+                                                <code class="block bg-gray-100 p-2 rounded text-xs mb-2" style="white-space: pre-wrap; word-break: break-word;">{{ $query['sql'] }}</code>
+                                                @if(!empty($query['bindings']))
+                                                    <button class="text-blue-600 hover:text-blue-900 text-sm font-medium" onclick="toggleBindings({{ $index }})">
+                                                        <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                                                        </svg>
+                                                        Show Bindings
+                                                    </button>
+                                                    <div id="bindings-{{ $index }}" class="hidden mt-2">
+                                                        <div class="bg-blue-50 border border-blue-200 rounded p-3">
+                                                            <strong class="text-sm">Bindings:</strong>
+                                                            <pre class="mt-1 text-xs">{{ json_encode($query['bindings'], JSON_PRETTY_PRINT) }}</pre>
+                                                        </div>
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td class="px-3 py-4 whitespace-nowrap">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $query['time'] > 100 ? 'bg-red-100 text-red-800' : ($query['time'] > 50 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800') }}">
+                                                    {{ number_format($query['time'], 2) }}ms
+                                                </span>
+                                            </td>
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                @if(!empty($query['bindings']))
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                        {{ count($query['bindings']) }}
+                                                    </span>
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        @php
+                            $slowQueries = collect($log->queries)->filter(function($query) {
+                                return $query['time'] > 100;
+                            });
+                        @endphp
+                        
+                        @if($slowQueries->count() > 0)
+                            <div class="mt-4 bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-sm font-medium text-yellow-800">Performance Warning</h3>
+                                        <p class="mt-1 text-sm text-yellow-700">
+                                            {{ $slowQueries->count() }} slow {{ Str::plural('query', $slowQueries->count()) }} detected (>100ms)
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm" onclick="exportQueries()">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    Export Queries
                 </button>
-            </div>
-            <div class="modal-body">
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h6 class="text-muted mb-0">Total Queries</h6>
-                                <h3 class="mb-0">{{ count($log->queries) }}</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h6 class="text-muted mb-0">Total Time</h6>
-                                <h3 class="mb-0">{{ number_format($log->query_time, 2) }}ms</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h6 class="text-muted mb-0">Average Time</h6>
-                                <h3 class="mb-0">{{ number_format($log->query_time / count($log->queries), 2) }}ms</h3>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped">
-                        <thead>
-                            <tr>
-                                <th width="5%">#</th>
-                                <th width="75%">Query</th>
-                                <th width="10%">Time</th>
-                                <th width="10%">Bindings</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($log->queries as $index => $query)
-                                <tr>
-                                    <td>{{ $index + 1 }}</td>
-                                    <td>
-                                        <code class="d-block mb-2" style="white-space: pre-wrap; word-break: break-word;">{{ $query['sql'] }}</code>
-                                        @if(!empty($query['bindings']))
-                                            <button class="btn btn-sm btn-outline-info" type="button" data-toggle="collapse" data-target="#bindings-{{ $index }}" aria-expanded="false">
-                                                <i class="fas fa-link"></i> Show Bindings
-                                            </button>
-                                            <div class="collapse mt-2" id="bindings-{{ $index }}">
-                                                <div class="card card-body bg-light">
-                                                    <strong>Bindings:</strong>
-                                                    <pre class="mb-0">{{ json_encode($query['bindings'], JSON_PRETTY_PRINT) }}</pre>
-                                                </div>
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <span class="badge badge-{{ $query['time'] > 100 ? 'danger' : ($query['time'] > 50 ? 'warning' : 'success') }}">
-                                            {{ number_format($query['time'], 2) }}ms
-                                        </span>
-                                    </td>
-                                    <td>
-                                        @if(!empty($query['bindings']))
-                                            <span class="badge badge-info">{{ count($query['bindings']) }}</span>
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-                
-                @php
-                    $slowQueries = collect($log->queries)->filter(function($query) {
-                        return $query['time'] > 100;
-                    });
-                @endphp
-                
-                @if($slowQueries->count() > 0)
-                    <div class="alert alert-warning mt-3">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Performance Warning:</strong> {{ $slowQueries->count() }} slow {{ Str::plural('query', $slowQueries->count()) }} detected (>100ms)
-                    </div>
-                @endif
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="exportQueries()">
-                    <i class="fas fa-download"></i> Export Queries
+                <button type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm" onclick="hideQueriesModal()">
+                    Close
                 </button>
             </div>
         </div>
@@ -575,6 +596,37 @@ function copyReproductionCommand() {
     copyToClipboard('curl-command');
 }
 
+function showQueriesModal() {
+    const modal = document.getElementById('queriesModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        // Add fade-in animation
+        setTimeout(() => {
+            modal.querySelector('.bg-gray-500').classList.add('opacity-75');
+            modal.querySelector('.inline-block').classList.add('opacity-100', 'translate-y-0');
+        }, 10);
+    }
+}
+
+function hideQueriesModal() {
+    const modal = document.getElementById('queriesModal');
+    if (modal) {
+        // Add fade-out animation
+        modal.querySelector('.bg-gray-500').classList.remove('opacity-75');
+        modal.querySelector('.inline-block').classList.remove('opacity-100', 'translate-y-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+}
+
+function toggleBindings(index) {
+    const bindingsDiv = document.getElementById('bindings-' + index);
+    if (bindingsDiv) {
+        bindingsDiv.classList.toggle('hidden');
+    }
+}
+
 function exportQueries() {
     @if(isset($log) && $log->queries)
         const queries = @json($log->queries);
@@ -599,6 +651,13 @@ function exportQueries() {
         linkElement.click();
     @endif
 }
+
+// Close modal on ESC key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        hideQueriesModal();
+    }
+});
 </script>
 @endsection
 
